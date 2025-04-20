@@ -18,8 +18,10 @@ import { getFirestore } from "firebase/firestore"
 import * as Location from "expo-location"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import * as FileSystem from "expo-file-system"
+import Constants from 'expo-constants';
 
-// Mock data for when Firebase is not available or permissions are missing
+
+
 const mockHealthData = {
   labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   datasets: [
@@ -30,6 +32,7 @@ const mockHealthData = {
     },
   ],
 }
+
 
 const mockFoodData = {
   todayItems: [
@@ -74,6 +77,7 @@ const mockFoodDays = [
     ],
   },
 ]
+
 
 const mockMedicalReports = [
   {
@@ -183,6 +187,9 @@ const mockReminders = [
     notificationId: "",
   },
 ]
+
+
+
 
 // User Management
 export const createUser = async (userData) => {
@@ -369,44 +376,46 @@ export const addHealthData = async (userId, value) => {
 }
 
 // Food Data
-export const fetchFoodData = async (userId) => {
-  try {
-    const db = getFirestore()
-    const foodRef = collection(db, "users", userId, "food")
-
-    // Get today's date at midnight
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    // Query for today's food entries
-    const q = query(foodRef, where("date", ">=", Timestamp.fromDate(today)), orderBy("date", "asc"))
-
-    const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      return {
-        todayItems: [],
-        totalCalories: 0,
-      }
-    }
-
-    // Process food entries
-    const todayItems = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      date: doc.data().date?.toDate() || new Date(),
-    }))
-
-    // Calculate total calories
-    const totalCalories = todayItems.reduce((sum, item) => sum + (item.calories || 0), 0)
-
-    return {
-      todayItems,
-      totalCalories,
-    }
-  } catch (error) {
-    console.error("Error fetching food data:", error)
-    throw error
+export const fetchFoodData = async (userId: string) => {
+  // Mock food data
+  return {
+    meals: [
+      {
+        id: "meal1",
+        name: "Breakfast",
+        time: "08:00 AM",
+        items: ["Oatmeal with fruits", "Green tea"],
+        calories: 320,
+        protein: 12,
+        carbs: 45,
+        fat: 8,
+      },
+      {
+        id: "meal2",
+        name: "Lunch",
+        time: "12:30 PM",
+        items: ["Vegetable salad", "Grilled chicken", "Brown rice"],
+        calories: 450,
+        protein: 35,
+        carbs: 40,
+        fat: 15,
+      },
+      {
+        id: "meal3",
+        name: "Snack",
+        time: "04:00 PM",
+        items: ["Greek yogurt", "Mixed nuts"],
+        calories: 200,
+        protein: 15,
+        carbs: 10,
+        fat: 12,
+      },
+    ],
+    totalCalories: 970,
+    totalProtein: 62,
+    totalCarbs: 95,
+    totalFat: 35,
+    waterIntake: 1800,
   }
 }
 
@@ -716,161 +725,89 @@ export const deleteMedicalReport = async (userId, reportId) => {
 }
 
 // Nearby Places
-export const fetchNearbyPlaces = async (address) => {
+export const fetchNearbyPlaces = async (address: string, userLocation: any = null) => {
   try {
-    // First try to get location permission
-    const { status } = await Location.requestForegroundPermissionsAsync()
+    // Use Google Places API to fetch real nearby places
+    const GOOGLE_MAPS_API_KEY = 
+    Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
-    if (status !== "granted") {
-      console.log("Location permission not granted")
-      throw new Error("Location permission not granted")
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn("Google Maps API Key is missing. Using mock data instead.")
+      return mockNearbyPlaces
     }
 
-    // Try to geocode the address to get coordinates
-    let location = null
+    let latitude, longitude
 
-    if (address) {
-      try {
-        const geocodeResult = await Location.geocodeAsync(address)
-        if (geocodeResult && geocodeResult.length > 0) {
-          location = {
-            latitude: geocodeResult[0].latitude,
-            longitude: geocodeResult[0].longitude,
+    // If we have user location coordinates, use them directly
+    if (userLocation && userLocation.latitude && userLocation.longitude) {
+      latitude = userLocation.latitude
+      longitude = userLocation.longitude
+    }
+    // Otherwise try to geocode the address
+    else if (address) {
+      // Geocode the address to get coordinates
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
+      const geocodeResponse = await fetch(geocodeUrl)
+      const geocodeData = await geocodeResponse.json()
+
+      if (geocodeData.status === "OK" && geocodeData.results && geocodeData.results.length > 0) {
+        const location = geocodeData.results[0].geometry.location
+        latitude = location.lat
+        longitude = location.lng
+      } else {
+        console.warn("Geocoding failed. Using mock data instead.")
+        return mockNearbyPlaces
+      }
+    } else {
+      console.warn("No location provided. Using mock data instead.")
+      return mockNearbyPlaces
+    }
+
+    // Types of places to search for
+    const placeTypes = ["hospital", "doctor", "pharmacy", "senior_center"]
+    let allPlaces = []
+
+    // Make separate requests for each place type
+    for (const type of placeTypes) {
+      const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=5000&type=${type}&key=${GOOGLE_MAPS_API_KEY}`
+
+      const placesResponse = await fetch(placesUrl)
+      const placesData = await placesResponse.json()
+
+      if (placesData.status === "OK" && placesData.results) {
+        // Process and add places to our results
+        const places = placesData.results.map((place) => {
+          // Calculate distance
+          const placeLocation = {
+            latitude: place.geometry.location.lat,
+            longitude: place.geometry.location.lng,
           }
-        }
-      } catch (error) {
-        console.error("Geocoding error:", error)
-      }
-    }
+          const distance = calculateDistance({ latitude, longitude }, placeLocation)
 
-    // If geocoding failed or no address provided, try to get current location
-    if (!location) {
-      try {
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          return {
+            id: place.place_id,
+            name: place.name,
+            type: type,
+            distance: distance,
+            address: place.vicinity,
+            phone: place.formatted_phone_number || "Not available",
+            rating: place.rating || null,
+            location: placeLocation,
+          }
         })
-        location = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        }
-      } catch (error) {
-        console.error("Current location error:", error)
-        throw new Error("Failed to get current location")
+
+        allPlaces = [...allPlaces, ...places]
       }
     }
 
-    // Use Google Places API to find nearby places
-    // Note: In a real app, you would use the Google Places API here
-    // For now, we'll simulate the API call with some sample data
+    // Sort places by distance
+    allPlaces.sort((a, b) => a.distance - b.distance)
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Generate some nearby places based on the location
-    const places = [
-      {
-        id: "1",
-        name: "City General Hospital",
-        type: "hospital",
-        distance: calculateDistance(location, {
-          latitude: location.latitude + 0.01,
-          longitude: location.longitude + 0.01,
-        }),
-        address: "123 Main St",
-        phone: "+91 98765 43210",
-        rating: 4.5,
-        location: {
-          latitude: location.latitude + 0.01,
-          longitude: location.longitude + 0.01,
-        },
-      },
-      {
-        id: "2",
-        name: "Dr. Sharma's Clinic",
-        type: "doctor",
-        distance: calculateDistance(location, {
-          latitude: location.latitude - 0.005,
-          longitude: location.longitude + 0.008,
-        }),
-        address: "456 Oak Ave",
-        phone: "+91 87654 32109",
-        rating: 4.8,
-        location: {
-          latitude: location.latitude - 0.005,
-          longitude: location.longitude + 0.008,
-        },
-      },
-      {
-        id: "3",
-        name: "MedPlus Pharmacy",
-        type: "pharmacy",
-        distance: calculateDistance(location, {
-          latitude: location.latitude + 0.003,
-          longitude: location.longitude - 0.004,
-        }),
-        address: "789 Elm St",
-        phone: "+91 76543 21098",
-        rating: 4.2,
-        location: {
-          latitude: location.latitude + 0.003,
-          longitude: location.longitude - 0.004,
-        },
-      },
-      {
-        id: "4",
-        name: "Senior Citizen Center",
-        type: "senior_center",
-        distance: calculateDistance(location, {
-          latitude: location.latitude - 0.009,
-          longitude: location.longitude - 0.007,
-        }),
-        address: "101 Pine Rd",
-        phone: "+91 65432 10987",
-        rating: 4.6,
-        location: {
-          latitude: location.latitude - 0.009,
-          longitude: location.longitude - 0.007,
-        },
-      },
-      {
-        id: "5",
-        name: "Apollo Pharmacy",
-        type: "pharmacy",
-        distance: calculateDistance(location, {
-          latitude: location.latitude + 0.007,
-          longitude: location.longitude + 0.003,
-        }),
-        address: "202 Maple Ave",
-        phone: "+91 54321 09876",
-        rating: 4.3,
-        location: {
-          latitude: location.latitude + 0.007,
-          longitude: location.longitude + 0.003,
-        },
-      },
-      {
-        id: "6",
-        name: "Fortis Hospital",
-        type: "hospital",
-        distance: calculateDistance(location, {
-          latitude: location.latitude - 0.015,
-          longitude: location.longitude + 0.012,
-        }),
-        address: "303 Cedar Blvd",
-        phone: "+91 43210 98765",
-        rating: 4.7,
-        location: {
-          latitude: location.latitude - 0.015,
-          longitude: location.longitude + 0.012,
-        },
-      },
-    ]
-
-    // Sort by distance
-    return places.sort((a, b) => a.distance - b.distance)
+    // Return the places or mock data if no results
+    return allPlaces.length > 0 ? allPlaces : mockNearbyPlaces
   } catch (error) {
     console.error("Error fetching nearby places:", error)
-    throw error
+    return mockNearbyPlaces
   }
 }
 

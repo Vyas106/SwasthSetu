@@ -1,182 +1,493 @@
 "use client"
 
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native"
+import type React from "react"
+import { useState, useEffect } from "react"
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
-import { Feather } from "@expo/vector-icons"
+import { useLanguage } from "@/context/LanguageContext"
 import { LineChart } from "react-native-chart-kit"
-import { useRouter } from "expo-router"
-import Animated, { FadeIn } from "react-native-reanimated"
-import { Platform } from "react-native"
-import * as Haptics from "expo-haptics"
+import { Dimensions } from "react-native"
+import { Feather } from "@expo/vector-icons"
+import { useAuth } from "@/context/AuthContext"
+import { fetchFoodDays } from "@/services/firebase"
 
-interface HealthChartProps {
+type HealthChartProps = {
   healthData: any
 }
 
-export const HealthChart = ({ healthData }: HealthChartProps) => {
+export const HealthChart: React.FC<HealthChartProps> = ({ healthData }) => {
   const { theme } = useTheme()
-  const router = useRouter()
+  const { translateUI } = useLanguage()
+  const { user } = useAuth()
+  const [activeMetric, setActiveMetric] = useState("bloodPressure")
+  const screenWidth = Dimensions.get("window").width - 32 // Adjust for padding
+  const [foodData, setFoodData] = useState(null)
+  const [nutritionData, setNutritionData] = useState({
+    calories: [],
+    protein: [],
+    carbs: [],
+    fat: [],
+  })
 
-  const handleInfoPress = () => {
-    if (Platform.OS === "ios") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+  // Fetch food data for nutrition tracking
+  useEffect(() => {
+    const loadFoodData = async () => {
+      if (user) {
+        try {
+          const data = await fetchFoodDays(user.id)
+          setFoodData(data)
+
+          // Process nutrition data from food entries
+          processNutritionData(data)
+        } catch (error) {
+          console.error("Error loading food data for health chart:", error)
+        }
+      }
     }
-    router.push("/graph-info")
+
+    loadFoodData()
+  }, [user])
+
+  // Process nutrition data from food entries
+  const processNutritionData = (foodDays) => {
+    if (!foodDays || foodDays.length === 0) return
+
+    // Initialize arrays for each metric
+    const calories = []
+    const protein = []
+    const carbs = []
+    const fat = []
+
+    // Get the last 7 days of data (or less if not available)
+    const last7Days = foodDays.slice(0, 7)
+
+    // Process each day
+    last7Days.forEach((day) => {
+      // Add total calories for the day
+      calories.push({
+        date: day.date.toISOString().split("T")[0],
+        value: day.totalCalories,
+      })
+
+      // Calculate total nutrients for the day
+      let totalProtein = 0
+      let totalCarbs = 0
+      let totalFat = 0
+
+      day.items.forEach((item) => {
+        // Extract nutritional info if available
+        if (item.nutritionalInfo) {
+          totalProtein += Number.parseFloat(item.nutritionalInfo.protein) || 0
+          totalCarbs += Number.parseFloat(item.nutritionalInfo.carbs) || 0
+          totalFat += Number.parseFloat(item.nutritionalInfo.fat) || 0
+        }
+      })
+
+      // Add nutrient totals for the day
+      protein.push({
+        date: day.date.toISOString().split("T")[0],
+        value: totalProtein,
+      })
+
+      carbs.push({
+        date: day.date.toISOString().split("T")[0],
+        value: totalCarbs,
+      })
+
+      fat.push({
+        date: day.date.toISOString().split("T")[0],
+        value: totalFat,
+      })
+    })
+
+    // Sort data by date (oldest to newest)
+    const sortByDate = (a, b) => new Date(a.date) - new Date(b.date)
+
+    setNutritionData({
+      calories: calories.sort(sortByDate),
+      protein: protein.sort(sortByDate),
+      carbs: carbs.sort(sortByDate),
+      fat: fat.sort(sortByDate),
+    })
   }
 
-  // Default data if none provided
-  const defaultData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    datasets: [
-      {
-        data: [65, 70, 68, 72, 75, 71, 73],
-        color: () => theme.colors.primary,
-        strokeWidth: 2,
-      },
-    ],
-    legend: ["Health Score"],
+  const getChartData = () => {
+    if (!healthData) return null
+
+    const labels = healthData[activeMetric].map((item: any) => {
+      const date = new Date(item.date)
+      return `${date.getDate()}/${date.getMonth() + 1}`
+    })
+
+    switch (activeMetric) {
+      case "bloodPressure":
+        return {
+          labels,
+          datasets: [
+            {
+              data: healthData.bloodPressure.map((item: any) => item.systolic),
+              color: () => theme.colors.error,
+              strokeWidth: 2,
+            },
+            {
+              data: healthData.bloodPressure.map((item: any) => item.diastolic),
+              color: () => theme.colors.info,
+              strokeWidth: 2,
+            },
+          ],
+          legend: ["Systolic", "Diastolic"],
+        }
+      case "bloodSugar":
+        return {
+          labels,
+          datasets: [
+            {
+              data: healthData.bloodSugar.map((item: any) => item.value),
+              color: () => theme.colors.accent,
+              strokeWidth: 2,
+            },
+          ],
+          legend: ["Blood Sugar"],
+        }
+      case "heartRate":
+        return {
+          labels,
+          datasets: [
+            {
+              data: healthData.heartRate.map((item: any) => item.value),
+              color: () => theme.colors.error,
+              strokeWidth: 2,
+            },
+          ],
+          legend: ["Heart Rate"],
+        }
+      case "weight":
+        return {
+          labels,
+          datasets: [
+            {
+              data: healthData.weight.map((item: any) => item.value),
+              color: () => theme.colors.primary,
+              strokeWidth: 2,
+            },
+          ],
+          legend: ["Weight"],
+        }
+      case "nutrition":
+        // Use nutrition data from food entries if available
+        if (nutritionData.calories.length > 0) {
+          const nutritionLabels = nutritionData.calories.map((item) => {
+            const date = new Date(item.date)
+            return `${date.getDate()}/${date.getMonth() + 1}`
+          })
+
+          return {
+            labels: nutritionLabels,
+            datasets: [
+              {
+                data: nutritionData.calories.map((item) => item.value),
+                color: () => theme.colors.primary,
+                strokeWidth: 2,
+              },
+            ],
+            legend: ["Calories"],
+          }
+        }
+        return null
+      case "nutrients":
+        // Show protein, carbs, fat from food entries
+        if (nutritionData.protein.length > 0) {
+          const nutrientLabels = nutritionData.protein.map((item) => {
+            const date = new Date(item.date)
+            return `${date.getDate()}/${date.getMonth() + 1}`
+          })
+
+          return {
+            labels: nutrientLabels,
+            datasets: [
+              {
+                data: nutritionData.protein.map((item) => item.value),
+                color: () => theme.colors.info,
+                strokeWidth: 2,
+              },
+              {
+                data: nutritionData.carbs.map((item) => item.value),
+                color: () => theme.colors.primary,
+                strokeWidth: 2,
+              },
+              {
+                data: nutritionData.fat.map((item) => item.value),
+                color: () => theme.colors.error,
+                strokeWidth: 2,
+              },
+            ],
+            legend: ["Protein", "Carbs", "Fat"],
+          }
+        }
+        return null
+      default:
+        return null
+    }
   }
 
-  const chartConfig = {
-    backgroundGradientFrom: theme.colors.card,
-    backgroundGradientTo: theme.colors.card,
-    decimalPlaces: 0,
-    color: () => theme.colors.primary,
-    labelColor: () => theme.colors.textSecondary,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: "6",
-      strokeWidth: "2",
-      stroke: theme.colors.primary,
-    },
-    propsForBackgroundLines: {
-      stroke: theme.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-    },
+  const chartData = getChartData()
+
+  if (!healthData || !chartData) {
+    return null
   }
 
   return (
-    <Animated.View entering={FadeIn.delay(200).duration(800)} style={styles.container}>
-      <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Health Trends</Text>
-            <Text style={[styles.cardSubtitle, { color: theme.colors.textSecondary }]}>Last 7 days</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>{translateUI("Health Trends")}</Text>
+        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{translateUI("Last 7 days")}</Text>
+      </View>
+
+      <View style={styles.metricsSelector}>
+        <MetricButton
+          label="BP"
+          isActive={activeMetric === "bloodPressure"}
+          onPress={() => setActiveMetric("bloodPressure")}
+          theme={theme}
+        />
+        <MetricButton
+          label="Sugar"
+          isActive={activeMetric === "bloodSugar"}
+          onPress={() => setActiveMetric("bloodSugar")}
+          theme={theme}
+        />
+        <MetricButton
+          label="Heart"
+          isActive={activeMetric === "heartRate"}
+          onPress={() => setActiveMetric("heartRate")}
+          theme={theme}
+        />
+        <MetricButton
+          label="Weight"
+          isActive={activeMetric === "weight"}
+          onPress={() => setActiveMetric("weight")}
+          theme={theme}
+        />
+        <MetricButton
+          label="Cals"
+          isActive={activeMetric === "nutrition"}
+          onPress={() => setActiveMetric("nutrition")}
+          theme={theme}
+        />
+        <MetricButton
+          label="Macros"
+          isActive={activeMetric === "nutrients"}
+          onPress={() => setActiveMetric("nutrients")}
+          theme={theme}
+        />
+      </View>
+
+      <View style={styles.chartContainer}>
+        <LineChart
+          data={chartData}
+          width={screenWidth - 32} // Adjust for container padding
+          height={180}
+          chartConfig={{
+            backgroundColor: theme.colors.card,
+            backgroundGradientFrom: theme.colors.card,
+            backgroundGradientTo: theme.colors.card,
+            decimalPlaces: activeMetric === "weight" ? 1 : 0,
+            color: (opacity = 1) => theme.colors.text + opacity.toString(16).padStart(2, "0"),
+            labelColor: () => theme.colors.textSecondary,
+            style: {
+              borderRadius: 16,
+            },
+            propsForDots: {
+              r: "4",
+              strokeWidth: "2",
+            },
+          }}
+          bezier
+          style={styles.chart}
+          withInnerLines={false}
+          withOuterLines={true}
+          withShadow={false}
+          withDots={true}
+          withScrollableDot={false}
+          yAxisInterval={1}
+          fromZero={false}
+          segments={5}
+        />
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>{translateUI("Health Score")}</Text>
+          <View style={styles.statValueContainer}>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>{healthData.score}</Text>
+            <View
+              style={[
+                styles.changeIndicator,
+                {
+                  backgroundColor:
+                    healthData.weeklyChange > 0
+                      ? theme.colors.success + "20"
+                      : healthData.weeklyChange < 0
+                        ? theme.colors.error + "20"
+                        : theme.colors.gray[300] + "20",
+                },
+              ]}
+            >
+              <Feather
+                name={healthData.weeklyChange > 0 ? "arrow-up" : "arrow-down"}
+                size={12}
+                color={healthData.weeklyChange > 0 ? theme.colors.success : theme.colors.error}
+              />
+              <Text
+                style={[
+                  styles.changeText,
+                  {
+                    color:
+                      healthData.weeklyChange > 0
+                        ? theme.colors.success
+                        : healthData.weeklyChange < 0
+                          ? theme.colors.error
+                          : theme.colors.gray[500],
+                  },
+                ]}
+              >
+                {Math.abs(healthData.weeklyChange)}%
+              </Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={[styles.infoButton, { backgroundColor: theme.colors.primaryLight }]}
-            onPress={handleInfoPress}
-            activeOpacity={0.7}
+        </View>
+
+        <View style={styles.statItem}>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>{translateUI("Overall Status")}</Text>
+          <Text
+            style={[
+              styles.statValue,
+              {
+                color:
+                  healthData.status === "Good"
+                    ? theme.colors.success
+                    : healthData.status === "Fair"
+                      ? theme.colors.warning
+                      : theme.colors.error,
+              },
+            ]}
           >
-            <Feather name="info" size={16} color={theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.chartContainer}>
-          <LineChart
-            data={healthData || defaultData}
-            width={Platform.OS === "ios" ? 340 : 320}
-            height={220}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-            withInnerLines={false}
-            withOuterLines={true}
-            withDots={true}
-            withShadow={false}
-            segments={5}
-          />
-        </View>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.colors.primary }]}>72</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Health Score</Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.colors.success }]}>+5%</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Weekly Change</Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.colors.text }]}>Good</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Overall Status</Text>
-          </View>
+            {healthData.status}
+          </Text>
         </View>
       </View>
-    </Animated.View>
+    </View>
+  )
+}
+
+type MetricButtonProps = {
+  label: string
+  isActive: boolean
+  onPress: () => void
+  theme: any
+}
+
+const MetricButton: React.FC<MetricButtonProps> = ({ label, isActive, onPress, theme }) => {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.metricButton,
+        {
+          backgroundColor: isActive ? theme.colors.primary : theme.colors.background,
+          borderColor: isActive ? theme.colors.primary : theme.colors.border,
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={[
+          styles.metricButtonText,
+          {
+            color: isActive ? theme.colors.white : theme.colors.text,
+          },
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
-  },
-  card: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 24,
+    borderWidth: 1,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  header: {
     marginBottom: 16,
   },
-  cardTitle: {
-    fontFamily: "Inter-Bold",
+  title: {
     fontSize: 18,
+    fontFamily: "Inter-Bold",
+    marginBottom: 4,
   },
-  cardSubtitle: {
-    fontFamily: "Inter-Regular",
+  subtitle: {
     fontSize: 14,
-    marginTop: 2,
+    fontFamily: "Inter-Regular",
   },
-  infoButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+  metricsSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  metricButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  metricButtonText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
   },
   chartContainer: {
     alignItems: "center",
-    marginVertical: 8,
+    marginBottom: 16,
   },
   chart: {
-    marginVertical: 8,
     borderRadius: 16,
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0, 0, 0, 0.05)",
   },
   statItem: {
     flex: 1,
-    alignItems: "center",
-  },
-  statValue: {
-    fontFamily: "Inter-Bold",
-    fontSize: 18,
-    marginBottom: 4,
   },
   statLabel: {
+    fontSize: 14,
     fontFamily: "Inter-Regular",
-    fontSize: 12,
+    marginBottom: 4,
   },
-  divider: {
-    width: 1,
-    height: "80%",
-    alignSelf: "center",
+  statValue: {
+    fontSize: 18,
+    fontFamily: "Inter-Bold",
+  },
+  statValueContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  changeIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  changeText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+    marginLeft: 2,
   },
 })

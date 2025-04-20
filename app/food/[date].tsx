@@ -13,6 +13,7 @@ import {
   Share,
   Animated,
   Dimensions,
+  ScrollView,
 } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
@@ -209,6 +210,79 @@ Total Calories: ${totalCalories}
           <Text style={[styles.calorieValue, { color: theme.colors.primary }]}>{item.calories}</Text>
         </View>
 
+        {/* Enhanced Nutrition Information */}
+        {item.nutritionalInfo && (
+          <View style={styles.macronutrients}>
+            <View style={styles.macroItem}>
+              <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
+              <Text style={[styles.macroValue, { color: theme.colors.text }]}>{item.nutritionalInfo.protein}g</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
+              <Text style={[styles.macroValue, { color: theme.colors.text }]}>{item.nutritionalInfo.carbs}g</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
+              <Text style={[styles.macroValue, { color: theme.colors.text }]}>{item.nutritionalInfo.fat}g</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Ingredients Section */}
+        {item.ingredients && item.ingredients.length > 0 && (
+          <View style={styles.ingredientsSection}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Ingredients</Text>
+            <View style={styles.ingredientsList}>
+              {item.ingredients.slice(0, 5).map((ingredient, index) => (
+                <View key={index} style={styles.ingredientItem}>
+                  <Feather name="check" size={14} color={theme.colors.primary} style={styles.ingredientIcon} />
+                  <Text style={[styles.ingredientText, { color: theme.colors.text }]}>
+                    {typeof ingredient === "string" ? ingredient : ingredient.name || "Unknown"}
+                  </Text>
+                </View>
+              ))}
+              {item.ingredients.length > 5 && (
+                <Text style={[styles.moreIngredients, { color: theme.colors.primary }]}>
+                  +{item.ingredients.length - 5} more ingredients
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Health Benefits Section */}
+        {item.healthBenefits && item.healthBenefits.length > 0 && (
+          <View style={styles.benefitsSection}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Health Benefits</Text>
+            <View style={styles.benefitsList}>
+              {item.healthBenefits.slice(0, 3).map((benefit, index) => (
+                <View key={index} style={styles.benefitItem}>
+                  <Feather name="heart" size={14} color={theme.colors.success} style={styles.benefitIcon} />
+                  <Text style={[styles.benefitText, { color: theme.colors.text }]}>{benefit}</Text>
+                </View>
+              ))}
+              {item.healthBenefits.length > 3 && (
+                <Text style={[styles.moreBenefits, { color: theme.colors.primary }]}>
+                  +{item.healthBenefits.length - 3} more benefits
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Dietary Classifications */}
+        {item.dietaryClassifications && item.dietaryClassifications.length > 0 && (
+          <View style={styles.dietarySection}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {item.dietaryClassifications.map((classification, index) => (
+                <View key={index} style={[styles.dietaryTag, { backgroundColor: theme.colors.primaryLight }]}>
+                  <Text style={[styles.dietaryText, { color: theme.colors.primary }]}>{classification}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {item.nutritionalWarning && (
           <View style={[styles.warningBox, { backgroundColor: theme.colors.warningLight }]}>
             <Feather name="alert-triangle" size={16} color={theme.colors.warning} />
@@ -218,6 +292,15 @@ Total Calories: ${totalCalories}
       </View>
     </Animated.View>
   )
+
+  const calculateTotalMacro = (entries, macroType) => {
+    return entries.reduce((total, entry) => {
+      if (entry.nutritionalInfo && entry.nutritionalInfo[macroType]) {
+        return total + Number(entry.nutritionalInfo[macroType])
+      }
+      return total
+    }, 0)
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -243,21 +326,63 @@ Total Calories: ${totalCalories}
               </View>
             </View>
 
-            {nutritionData ? (
-              <View style={styles.chartContainer}>
-                <PieChart
-                  data={nutritionData}
-                  width={screenWidth - 64}
-                  height={180}
-                  chartConfig={{
-                    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    labelColor: (opacity = 1) => theme.colors.text,
-                  }}
-                  accessor="population"
-                  backgroundColor="transparent"
-                  paddingLeft="0"
-                  absolute
-                />
+            {foodEntries.length > 0 ? (
+              <View style={styles.nutritionDetails}>
+                <View style={styles.chartContainer}>
+                  {nutritionData ? (
+                    <PieChart
+                      data={nutritionData}
+                      width={screenWidth - 64}
+                      height={180}
+                      chartConfig={{
+                        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                        labelColor: (opacity = 1) => theme.colors.text,
+                      }}
+                      accessor="population"
+                      backgroundColor="transparent"
+                      paddingLeft="0"
+                      absolute
+                    />
+                  ) : (
+                    <View style={styles.noChartContainer}>
+                      <Text style={[styles.noChartText, { color: theme.colors.textSecondary }]}>
+                        Add food entries to see nutrition breakdown
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.macroSummary}>
+                  <View style={styles.macroSummaryItem}>
+                    <View style={[styles.macroIndicator, { backgroundColor: "#4E7AC7" }]} />
+                    <View style={styles.macroSummaryContent}>
+                      <Text style={[styles.macroSummaryLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
+                      <Text style={[styles.macroSummaryValue, { color: theme.colors.text }]}>
+                        {calculateTotalMacro(foodEntries, "protein")}g
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.macroSummaryItem}>
+                    <View style={[styles.macroIndicator, { backgroundColor: "#6C63FF" }]} />
+                    <View style={styles.macroSummaryContent}>
+                      <Text style={[styles.macroSummaryLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
+                      <Text style={[styles.macroSummaryValue, { color: theme.colors.text }]}>
+                        {calculateTotalMacro(foodEntries, "carbs")}g
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.macroSummaryItem}>
+                    <View style={[styles.macroIndicator, { backgroundColor: "#FF6384" }]} />
+                    <View style={styles.macroSummaryContent}>
+                      <Text style={[styles.macroSummaryLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
+                      <Text style={[styles.macroSummaryValue, { color: theme.colors.text }]}>
+                        {calculateTotalMacro(foodEntries, "fat")}g
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             ) : (
               <View style={styles.noChartContainer}>
@@ -382,8 +507,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter-Bold",
+    marginTop: 16,
+    marginBottom: 8,
   },
   entryCount: {
     fontFamily: "Inter-Regular",
@@ -491,5 +618,120 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  macronutrients: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.05)",
+  },
+  macroItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  macroLabel: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    marginBottom: 4,
+  },
+  macroValue: {
+    fontSize: 16,
+    fontFamily: "Inter-Bold",
+  },
+  ingredientsSection: {
+    marginTop: 8,
+  },
+  ingredientsList: {
+    marginLeft: 8,
+  },
+  ingredientItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  ingredientIcon: {
+    marginRight: 8,
+  },
+  ingredientText: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    flex: 1,
+  },
+  moreIngredients: {
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
+    marginTop: 4,
+    marginLeft: 22,
+  },
+  benefitsSection: {
+    marginTop: 8,
+  },
+  benefitsList: {
+    marginLeft: 8,
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  benefitIcon: {
+    marginRight: 8,
+  },
+  benefitText: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    flex: 1,
+  },
+  moreBenefits: {
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
+    marginTop: 4,
+    marginLeft: 22,
+  },
+  dietarySection: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  dietaryTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  dietaryText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+  },
+  nutritionDetails: {
+    marginTop: 16,
+  },
+  macroSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  macroSummaryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  macroIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  macroSummaryContent: {
+    flex: 1,
+  },
+  macroSummaryLabel: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+  },
+  macroSummaryValue: {
+    fontSize: 14,
+    fontFamily: "Inter-Bold",
   },
 })

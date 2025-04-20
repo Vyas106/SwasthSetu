@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  ScrollView,
 } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
@@ -387,30 +388,281 @@ export default function FoodScreen() {
                 {selectedImage && <Image source={{ uri: selectedImage }} style={styles.foodImage} />}
 
                 {analyzedFood && (
-                  <View style={styles.analysisResults}>
+                  <ScrollView style={styles.analysisResults}>
                     <Text style={[styles.analysisTitle, { color: theme.colors.text, fontSize: getFontSize(20) }]}>
                       {analyzedFood.name}
                     </Text>
 
-                    <View style={styles.nutritionItem}>
+                    {analyzedFood.description && (
                       <Text
                         style={[
-                          styles.nutritionLabel,
-                          { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                          styles.analysisDescription,
+                          { color: theme.colors.textSecondary, fontSize: getFontSize(14) },
                         ]}
                       >
-                        Calories:
+                        {analyzedFood.description}
                       </Text>
-                      <Text style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}>
-                        {analyzedFood.calories} cal
-                      </Text>
+                    )}
+
+                    <View style={styles.macronutrientSection}>
+                      <View style={styles.nutritionItem}>
+                        <Text
+                          style={[
+                            styles.nutritionLabel,
+                            { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                          ]}
+                        >
+                          Calories:
+                        </Text>
+                        <Text style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}>
+                          {analyzedFood.calories} cal
+                        </Text>
+                      </View>
+
+                      {analyzedFood.nutritionalInfo && (
+                        <>
+                          <View style={styles.nutritionItem}>
+                            <Text
+                              style={[
+                                styles.nutritionLabel,
+                                { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                              ]}
+                            >
+                              Protein:
+                            </Text>
+                            <Text
+                              style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}
+                            >
+                              {analyzedFood.nutritionalInfo.protein}g
+                            </Text>
+                          </View>
+
+                          <View style={styles.nutritionItem}>
+                            <Text
+                              style={[
+                                styles.nutritionLabel,
+                                { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                              ]}
+                            >
+                              Carbs:
+                            </Text>
+                            <Text
+                              style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}
+                            >
+                              {analyzedFood.nutritionalInfo.carbs}g
+                            </Text>
+                          </View>
+
+                          <View style={styles.nutritionItem}>
+                            <Text
+                              style={[
+                                styles.nutritionLabel,
+                                { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                              ]}
+                            >
+                              Fat:
+                            </Text>
+                            <Text
+                              style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}
+                            >
+                              {analyzedFood.nutritionalInfo.fat}g
+                            </Text>
+                          </View>
+
+                          <View style={styles.nutritionItem}>
+                            <Text
+                              style={[
+                                styles.nutritionLabel,
+                                { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                              ]}
+                            >
+                              Fiber:
+                            </Text>
+                            <Text
+                              style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}
+                            >
+                              {analyzedFood.nutritionalInfo.fiber}g
+                            </Text>
+                          </View>
+
+                          <View style={styles.nutritionItem}>
+                            <Text
+                              style={[
+                                styles.nutritionLabel,
+                                { color: theme.colors.textSecondary, fontSize: getFontSize(16) },
+                              ]}
+                            >
+                              Sugar:
+                            </Text>
+                            <Text
+                              style={[styles.nutritionValue, { color: theme.colors.text, fontSize: getFontSize(16) }]}
+                            >
+                              {analyzedFood.nutritionalInfo.sugar}g
+                            </Text>
+                          </View>
+                        </>
+                      )}
                     </View>
 
+                    {/* Vitamins & Minerals Section */}
+                    {analyzedFood.nutritionalInfo &&
+                      analyzedFood.nutritionalInfo.vitamins &&
+                      analyzedFood.nutritionalInfo.vitamins.length > 0 && (
+                        <View style={styles.micronutrientSection}>
+                          <Text style={[styles.sectionTitle, { color: theme.colors.text, fontSize: getFontSize(18) }]}>
+                            Vitamins & Minerals
+                          </Text>
+
+                          <View style={styles.micronutrientGrid}>
+                            {analyzedFood.nutritionalInfo.vitamins.slice(0, 4).map((vitamin, index) => (
+                              <View key={`vitamin-${index}`} style={styles.micronutrientItem}>
+                                <Text
+                                  style={[
+                                    styles.micronutrientName,
+                                    { color: theme.colors.primary, fontSize: getFontSize(14) },
+                                  ]}
+                                >
+                                  {vitamin.name}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.micronutrientValue,
+                                    { color: theme.colors.text, fontSize: getFontSize(12) },
+                                  ]}
+                                >
+                                  {vitamin.amount}
+                                </Text>
+                              </View>
+                            ))}
+
+                            {analyzedFood.nutritionalInfo.minerals.slice(0, 4).map((mineral, index) => (
+                              <View key={`mineral-${index}`} style={styles.micronutrientItem}>
+                                <Text
+                                  style={[
+                                    styles.micronutrientName,
+                                    { color: theme.colors.primary, fontSize: getFontSize(14) },
+                                  ]}
+                                >
+                                  {mineral.name}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.micronutrientValue,
+                                    { color: theme.colors.text, fontSize: getFontSize(12) },
+                                  ]}
+                                >
+                                  {mineral.amount}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                    {/* Ingredients Section */}
+                    {analyzedFood.ingredients && analyzedFood.ingredients.length > 0 && (
+                      <View style={styles.ingredientsSection}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontSize: getFontSize(18) }]}>
+                          Ingredients
+                        </Text>
+
+                        <View style={styles.ingredientsList}>
+                          {analyzedFood.ingredients.slice(0, 6).map((ingredient, index) => (
+                            <View key={index} style={styles.ingredientItem}>
+                              <Feather
+                                name="check"
+                                size={16}
+                                color={theme.colors.primary}
+                                style={styles.ingredientIcon}
+                              />
+                              <Text
+                                style={[styles.ingredientText, { color: theme.colors.text, fontSize: getFontSize(14) }]}
+                              >
+                                {typeof ingredient === "string" ? ingredient : ingredient.name || "Unknown"}
+                              </Text>
+                            </View>
+                          ))}
+
+                          {analyzedFood.ingredients.length > 6 && (
+                            <Text
+                              style={[
+                                styles.moreIngredients,
+                                { color: theme.colors.primary, fontSize: getFontSize(14) },
+                              ]}
+                            >
+                              +{analyzedFood.ingredients.length - 6} more ingredients
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Health Benefits Section */}
+                    {analyzedFood.healthBenefits && analyzedFood.healthBenefits.length > 0 && (
+                      <View style={styles.benefitsSection}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontSize: getFontSize(18) }]}>
+                          Health Benefits
+                        </Text>
+
+                        <View style={styles.benefitsList}>
+                          {analyzedFood.healthBenefits.slice(0, 3).map((benefit, index) => (
+                            <View key={index} style={styles.benefitItem}>
+                              <Feather name="heart" size={16} color={theme.colors.success} style={styles.benefitIcon} />
+                              <Text
+                                style={[styles.benefitText, { color: theme.colors.text, fontSize: getFontSize(14) }]}
+                              >
+                                {benefit}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Dietary Classifications */}
+                    {analyzedFood.dietaryClassifications && analyzedFood.dietaryClassifications.length > 0 && (
+                      <View style={styles.dietarySection}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontSize: getFontSize(18) }]}>
+                          Dietary Information
+                        </Text>
+
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dietaryScrollView}>
+                          {analyzedFood.dietaryClassifications.map((classification, index) => (
+                            <View
+                              key={index}
+                              style={[styles.dietaryTag, { backgroundColor: theme.colors.primaryLight }]}
+                            >
+                              <Text
+                                style={[styles.dietaryText, { color: theme.colors.primary, fontSize: getFontSize(14) }]}
+                              >
+                                {classification}
+                              </Text>
+                            </View>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+
+                    {/* Nutritional Warning */}
                     {analyzedFood.nutritionalWarning && (
                       <View style={[styles.warningBox, { backgroundColor: theme.colors.warningLight }]}>
                         <Feather name="alert-triangle" size={20} color={theme.colors.warning} />
                         <Text style={[styles.warningText, { color: theme.colors.warning, fontSize: getFontSize(14) }]}>
                           {analyzedFood.nutritionalWarning}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Cultural Origin */}
+                    {analyzedFood.culturalOrigin && (
+                      <View style={styles.originSection}>
+                        <Text
+                          style={[styles.originLabel, { color: theme.colors.textSecondary, fontSize: getFontSize(14) }]}
+                        >
+                          Cultural Origin:
+                        </Text>
+                        <Text style={[styles.originValue, { color: theme.colors.text, fontSize: getFontSize(14) }]}>
+                          {analyzedFood.culturalOrigin}
                         </Text>
                       </View>
                     )}
@@ -423,7 +675,7 @@ export default function FoodScreen() {
                         Save to Food Journal
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </ScrollView>
                 )}
               </>
             )}
@@ -666,5 +918,110 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
     marginTop: 8,
     textAlign: "center",
+  },
+  analysisDescription: {
+    fontFamily: "Inter-Regular",
+    marginBottom: 16,
+  },
+  macronutrientSection: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.1)",
+    borderRadius: 8,
+    padding: 12,
+  },
+  sectionTitle: {
+    fontFamily: "Inter-Bold",
+    marginBottom: 12,
+  },
+  micronutrientSection: {
+    marginTop: 24,
+  },
+  micronutrientGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  micronutrientItem: {
+    width: "48%",
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.03)",
+    borderRadius: 8,
+  },
+  micronutrientName: {
+    fontFamily: "Inter-Medium",
+    marginBottom: 4,
+  },
+  micronutrientValue: {
+    fontFamily: "Inter-Regular",
+  },
+  ingredientsSection: {
+    marginTop: 24,
+  },
+  ingredientsList: {
+    marginLeft: 8,
+  },
+  ingredientItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  ingredientIcon: {
+    marginRight: 8,
+  },
+  ingredientText: {
+    fontFamily: "Inter-Regular",
+    flex: 1,
+  },
+  moreIngredients: {
+    fontFamily: "Inter-Medium",
+    marginTop: 4,
+    marginLeft: 24,
+  },
+  benefitsSection: {
+    marginTop: 24,
+  },
+  benefitsList: {
+    marginLeft: 8,
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  benefitIcon: {
+    marginRight: 8,
+  },
+  benefitText: {
+    fontFamily: "Inter-Regular",
+    flex: 1,
+  },
+  dietarySection: {
+    marginTop: 24,
+  },
+  dietaryScrollView: {
+    marginBottom: 12,
+  },
+  dietaryTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  dietaryText: {
+    fontFamily: "Inter-Medium",
+  },
+  originSection: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  originLabel: {
+    fontFamily: "Inter-Medium",
+    marginRight: 8,
+  },
+  originValue: {
+    fontFamily: "Inter-Regular",
   },
 })
