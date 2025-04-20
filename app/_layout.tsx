@@ -1,39 +1,85 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+"use client"
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEffect, useState, useCallback } from "react"
+import { Stack } from "expo-router"
+import { ThemeProvider } from "@/context/ThemeContext"
+import { AuthProvider } from "@/context/AuthContext"
+import { FirebaseProvider } from "@/context/FirebaseContext"
+import { SafeAreaProvider } from "react-native-safe-area-context"
+import { useFonts } from "expo-font"
+import * as SplashScreen from "expo-splash-screen"
+import { LanguageProvider } from "@/context/LanguageContext"
+import { View, Text } from "react-native"
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore error */
+});
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+  const [appIsReady, setAppIsReady] = useState(false)
+
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    async function prepare() {
+      try {
+        // Pre-load fonts, make any API calls you need to do here
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      } catch (e) {
+        console.warn("Error in layout preparation:", e)
+      } finally {
+        // Tell the application to render
+        setAppIsReady(true)
+      }
     }
-  }, [loaded]);
 
-  if (!loaded) {
-    return null;
+    prepare()
+  }, [])
+
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady ) {
+      // Hide splash screen
+      await SplashScreen.hideAsync().catch(() => {
+        /* ignore error */
+      })
+    }
+  }, [appIsReady])
+
+  useEffect(() => {
+    if (appIsReady ) {
+      // Hide splash screen when ready
+      SplashScreen.hideAsync().catch(() => {
+        /* ignore error */
+      })
+    }
+  }, [appIsReady])
+
+  if (!appIsReady ) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading application...</Text>
+      </View>
+    )
   }
 
+  // If there was a font loading error, we should still render the app
+  // but log the error for debugging
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+    <SafeAreaProvider onLayout={onLayoutRootView}>
+      <FirebaseProvider>
+        <AuthProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                }}
+              />
+            </ThemeProvider>
+          </LanguageProvider>
+        </AuthProvider>
+      </FirebaseProvider>
+    </SafeAreaProvider>
+  )
 }
